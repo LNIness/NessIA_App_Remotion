@@ -1,7 +1,9 @@
 import express from "express";
+import { bundle } from "@remotion/bundler";
+import { renderMedia, getCompositions } from "@remotion/renderer";
+import path from "path";
+import fs from "fs";
 import { downloadMediaToPublic } from "./services/download.service";
-import { getBundleLocation, invalidateBundleCache } from "./services/bundle.service";
-import { renderVideo, RenderRequestBody } from "./services/render.service";
 
 const app = express();
 app.use(express.json({ limit: "50mb" }));
@@ -14,41 +16,67 @@ app.get("/", (_req, res) => {
 
 app.post("/render", async (req, res) => {
   try {
-    const inputProps = req.body as RenderRequestBody;
-    const scenes = inputProps.scenes ?? [];
+    const inputProps = req.body;
 
-    if (!Array.isArray(scenes) || scenes.length === 0) {
-      return res.status(400).json({ error: "No scenes provided" });
-    }
-
-    // Download -> /public/assets
-    // IMPORTANT: si on télécharge au moins un fichier, on invalide le bundle
-    // pour être sûr que staticFile() puisse les servir.
-    let downloaded = false;
-
-    for (let i = 0; i < scenes.length; i++) {
-      const scene = scenes[i];
-      if (!scene?.url) {
-        return res.status(400).json({ error: `Scene ${i} missing url` });
+    // 1) Télécharger les médias -> /public/assets (pour staticFile)
+    if (Array.isArray(inputProps.scenes)) {
+      for (let i = 0; i < inputProps.scenes.length; i++) {
+        const scene = inputProps.scenes[i];
+        if (scene?.url && typeof scene.url === "string" && !scene.url.startsWith("/assets/")) {
+          const newUrl = await downloadMediaToPublic(scene.url, i);
+          inputProps.scenes[i].url = newUrl;
+        }
       }
-
-      if (scene.url.startsWith("/assets/")) continue;
-
-      const newUrl = await downloadMediaToPublic(scene.url, i);
-      scenes[i] = { ...scene, url: newUrl };
-      downloaded = true;
     }
 
-    inputProps.scenes = scenes;
+    console.log("SCENES:", inputProps.scenes);
 
-    if (downloaded) {
-      invalidateBundleCache();
+    // 2) Bundle
+    const bundleLocation = await bundle({
+      entryPoint: path.resolve("./src/index.ts"),
+    });
+
+    // 3) Compositions
+    const compositions = await getCompositions(bundleLocation, { inputProps });
+    const composition = compositions.find((c) => c.id === "MyComp");
+
+    if (!composition) {
+      throw new Error("Composition 'MyComp' not found");
     }
 
-    const bundleLocation = await getBundleLocation();
-    const { outputLocation } = await renderVideo({
+    // 4) Output
+    const outputDir = path.resolve("./out");
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
+    const outputLocation = path.join(outputDir, `video-${Date.now()}.mp4`);
+
+    // 5) Durée
+    const fps = composition.fps;
+    const totalDurationInSeconds = (inputProps.scenes ?? []).reduce(
+      (acc: number, scene: any) => acc + (scene?.duration ?? 0),
+      0
+    );
+    const totalDurationInFrames = Math.max(1, Math.floor(totalDurationInSeconds * fps));
+
+    console.log("TOTAL SECONDS:", totalDurationInSeconds);
+    console.log("TOTAL FRAMES:", totalDurationInFrames);
+
+    // 6) Render
+    await renderMedia({
+      composition: {
+        ...composition,
+        durationInFrames: totalDurationInFrames,
+      },
       serveUrl: bundleLocation,
+      codec: "h264",
+      outputLocation,
       inputProps,
+      chromiumOptions: {
+        disableWebSecurity: true,
+        ignoreCertificateErrors: true,
+      },
     });
 
     res.json({ success: true, output: outputLocation });

@@ -1,23 +1,13 @@
 import path from "path";
-import fs from "fs";
 import { bundle } from "@remotion/bundler";
 
 let cachedBundleLocation: string | null = null;
 let bundlingPromise: Promise<string> | null = null;
 
-const getStudioRenderEntryPath = (): string => {
-  // On résout le dossier du package sans passer par les subpaths "exports"
-  const studioPkgJson = require.resolve("@remotion/studio/package.json");
-  const studioRoot = path.dirname(studioPkgJson);
+type WebpackAliasObject = { [key: string]: string | false | string[] };
 
-  // On pointe vers le fichier réellement présent dans l'image
-  const candidate = path.join(studioRoot, "dist", "renderEntry.js");
-
-  if (!fs.existsSync(candidate)) {
-    throw new Error(`@remotion/studio renderEntry not found at: ${candidate}`);
-  }
-
-  return candidate;
+const isAliasObject = (alias: unknown): alias is WebpackAliasObject => {
+  return typeof alias === "object" && alias !== null && !Array.isArray(alias);
 };
 
 export const getBundleLocation = async (): Promise<string> => {
@@ -25,31 +15,31 @@ export const getBundleLocation = async (): Promise<string> => {
   if (bundlingPromise) return bundlingPromise;
 
   bundlingPromise = (async () => {
-    const renderEntryPath = getStudioRenderEntryPath();
-
     const location = await bundle({
       entryPoint: path.resolve("./src/index.ts"),
-      webpackOverride: (currentConfiguration) => {
-        currentConfiguration.resolve = currentConfiguration.resolve ?? {};
+      webpackOverride: (config) => {
+        config.resolve = config.resolve ?? {};
 
-        // Webpack: alias peut être objet ou array selon versions/config
-        const existingAlias = currentConfiguration.resolve.alias;
+        const currentAlias = config.resolve.alias;
 
-        if (Array.isArray(existingAlias)) {
-          // Cas rare : on ne merge pas “proprement” ici,
-          // mais on laisse tel quel pour ne pas casser la config.
-          // Dans ce cas, on ajoute un fallback via aliasFields (moins robuste),
-          // donc on préfère ne pas être dans ce cas.
-          // (Si ça arrive, on adaptera précisément.)
-          return currentConfiguration;
+        // On ne modifie que si alias est un objet (cas standard)
+        if (isAliasObject(currentAlias)) {
+          const nextAlias: WebpackAliasObject = { ...currentAlias };
+
+          // IMPORTANT:
+          // empêcher "@remotion/studio" (préfixe) de matcher "@remotion/studio/renderEntry"
+          if (
+            nextAlias["@remotion/studio"] !== undefined &&
+            nextAlias["@remotion/studio$"] === undefined
+          ) {
+            nextAlias["@remotion/studio$"] = nextAlias["@remotion/studio"];
+            delete nextAlias["@remotion/studio"];
+          }
+
+          config.resolve.alias = nextAlias;
         }
 
-        currentConfiguration.resolve.alias = {
-          ...(existingAlias ?? {}),
-          "@remotion/studio/renderEntry": renderEntryPath,
-        };
-
-        return currentConfiguration;
+        return config;
       },
     });
 
@@ -61,9 +51,6 @@ export const getBundleLocation = async (): Promise<string> => {
   return bundlingPromise;
 };
 
-/**
- * À appeler si tu changes des fichiers qu'on veut voir dans le bundle (ex: nouveaux assets).
- */
 export const invalidateBundleCache = (): void => {
   cachedBundleLocation = null;
   bundlingPromise = null;
