@@ -9,6 +9,7 @@
     "@remotion/cli": "^4.0.423",
     "@remotion/studio": "^4.0.423",
     "@remotion/tailwind-v4": "4.0.423",
+    "@remotion/transitions": "4.0.423",
     "axios": "^1.13.5",
     "express": "^5.2.1",
     "react": "19.2.3",
