@@ -32,3 +32,5 @@ COPY . .
 EXPOSE 3000
 
 CMD ["npx", "tsx", "src/server.ts"]
+ENV REMOTION_CHROME_CACHE_DIR=/app/.remotion-browser-cache
+ENV PUPPETEER_CACHE_DIR=/app/.remotion-browser-cache

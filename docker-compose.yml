@@ -1,0 +1,16 @@
+﻿services:
+  remotion-render:
+    container_name: remotion-render
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    shm_size: "2gb"
+    environment:
+      REMOTION_CHROME_CACHE_DIR: /app/.remotion-browser-cache
+      PUPPETEER_CACHE_DIR: /app/.remotion-browser-cache
+    volumes:
+      - ./output:/app/out
+      - ./chrome-cache:/app/.remotion-browser-cache
+    restart: unless-stopped
