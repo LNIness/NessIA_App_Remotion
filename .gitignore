@@ -5,3 +5,9 @@ dist
 
 # Ignore the output video from Git but not videos you import into src/.
 out
+
+# Médias téléchargés dynamiquement par le serveur
+public/assets/
+
+# Bundle Remotion généré
+.remotion/

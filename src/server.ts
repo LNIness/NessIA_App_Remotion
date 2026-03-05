@@ -1,9 +1,8 @@
 import express from "express";
 import { bundle } from "@remotion/bundler";
-import { renderMedia, getCompositions } from "@remotion/renderer";
 import path from "path";
-import fs from "fs";
 import { downloadMediaToPublic } from "./services/download.service";
+import { renderVideo } from "./services/render.service";
 
 const app = express();
 app.use(express.json({ limit: "50mb" }));
@@ -19,12 +18,12 @@ app.post("/render", async (req, res) => {
     const inputProps = req.body;
 
     // 1) Télécharger les médias -> /public/assets (pour staticFile)
-    if (Array.isArray(inputProps.scenes)) {
-      for (let i = 0; i < inputProps.scenes.length; i++) {
-        const scene = inputProps.scenes[i];
-        if (scene?.url && typeof scene.url === "string" && !scene.url.startsWith("/assets/")) {
-          const newUrl = await downloadMediaToPublic(scene.url, i);
-          inputProps.scenes[i].url = newUrl;
+    if (Array.isArray(inputProps.clips)) {
+      for (let i = 0; i < inputProps.clips.length; i++) {
+        const clip = inputProps.clips[i];
+        if (clip?.url && typeof clip.url === "string" && !clip.url.startsWith("/assets/")) {
+          const newUrl = await downloadMediaToPublic(clip.url, i);
+          inputProps.clips[i].url = newUrl;
         }
       }
     }
@@ -34,40 +33,10 @@ app.post("/render", async (req, res) => {
       entryPoint: path.resolve("./src/index.ts"),
     });
 
-    // 3) Récupérer la composition
-    // Grâce à calculateMetadata dans Root.tsx, cette étape calcule la durée réelle
-    const compositions = await getCompositions(bundleLocation, { inputProps });
-    const composition = compositions.find((c) => c.id === "MyComp");
-
-    if (!composition) {
-      throw new Error("Composition 'MyComp' not found");
-    }
-
-    // Log pour debug : vérifie si la durée correspond à tes attentes
-    console.log(`Rendering ${composition.id}: ${composition.durationInFrames} frames at ${composition.fps}fps`);
-
-    // 4) Préparer le dossier de sortie
-    const outputDir = path.resolve("./out");
-    if (!fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir, { recursive: true });
-    }
-    const outputLocation = path.join(outputDir, `video-${Date.now()}.mp4`);
-
-    // 5) Rendu
-    // On passe l'objet composition tel quel.
-// 6) Render
-    await renderMedia({
-      composition: composition, 
+    // 3) Rendu via le service
+    const { outputLocation } = await renderVideo({
       serveUrl: bundleLocation,
-      codec: "h264",
-      outputLocation,
       inputProps,
-      chromiumOptions: {
-        disableWebSecurity: true,
-        ignoreCertificateErrors: true,
-        // On retire 'args' qui n'existe pas dans le type ChromiumOptions
-        // Remotion gère déjà l'essentiel en interne.
-      },
     });
 
     res.json({ success: true, output: outputLocation });

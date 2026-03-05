@@ -1,15 +1,15 @@
 # Remotion Render Server (Docker)
 
-Serveur Express qui reçoit un storyboard JSON (`scenes`) et génère une vidéo via Remotion.
+Serveur Express qui reçoit un storyboard JSON (`clips`) et génère une vidéo via Remotion.
 Les médias distants (image/vidéo) sont téléchargés dans `public/assets` pour être servis au rendu.
 
 ---
 
 ## Prérequis pour Windows 10
 
-- **Docker Desktop** (mode Linux containers, Docker Compose v2 inclus ) :
+- **Docker Desktop** (mode Linux containers, Docker Compose v2 inclus) :
 <https://docs.docker.com/desktop/setup/install/windows-install/>
-- (Optionnel) **Node.js 20+** si on veux lancer hors Docker
+- (Optionnel) **Node.js 20+** si on veut lancer hors Docker
 
 ### Notes
 
@@ -19,95 +19,226 @@ Les médias distants (image/vidéo) sont téléchargés dans `public/assets` pou
 ## Structure (résumé)
 
 - `src/server.ts` : API HTTP `/render`
-- `src/compositions/Composition.tsx` : composition Remotion (React)
+- `src/Root.tsx` : point d'entrée Remotion, déclare les compositions
+- `src/compositions/Composition.tsx` : rendu des clips (React)
+- `src/compositions/VideoCompositionConfig.tsx` : config de la composition (durée, format, fps)
+- `src/components/transitions/` : transitions disponibles (`fade.ts`, `slide.ts`, `index.ts`)
+- `src/utils/frames.ts` : calcul de la durée totale en frames
 - `src/services/download.service.ts` : download des médias vers `public/assets`
+- `src/services/render.service.ts` : orchestration du rendu Remotion
 - `public/assets/` : médias téléchargés (servis pendant le rendu)
-- `output/` : vidéos rendues (monté depuis le container)
+- `out/` : vidéos rendues
+
+## Contrat JSON
+
+```json
+{
+  "width": 1080,
+  "height": 1920,
+  "fps": 30,
+  "clips": [
+    {
+      "id": "clip-1",
+      "type": "image",
+      "url": "https://...",
+      "duration": 3.0
+    },
+    {
+      "id": "clip-2",
+      "type": "video",
+      "url": "https://...",
+      "duration": 5.0,
+      "trimStart": 0,
+      "transitionToNext": {
+        "type": "whiteFade",
+        "timing": "linear",
+        "durationInFrames": 20
+      }
+    }
+  ],
+  "audio": {
+    "musicUrl": "/assets/music.mp3",
+    "volume": 0.8
+  }
+}
+```
+
+### Champs racine
+
+| Champ | Type | Défaut | Description |
+ | --- | --- | --- | --- |  
+| `width` | number | 1080 | Largeur en pixels |
+| `height` | number | 1920 | Hauteur en pixels |
+| `fps` | number | 30 | Images par seconde |
+| `clips` | MediaClip[] | — | Liste des plans |
+| `audio.musicUrl` | string | — | URL ou `/assets/...` |
+| `audio.volume` | number | 1 | Volume entre 0 et 1 |
+
+### MediaClip
+
+| Champ | Type | Requis | Description |
+ | --- | --- | --- | --- |  
+| `id` | string | ✅ | Identifiant unique |
+| `type` | `"image"` \| `"video"` | ✅ | Type de média |
+| `url` | string | ✅ | URL externe ou `/assets/...` |
+| `duration` | number | ✅ | Durée en secondes |
+| `trimStart` | number | — | Offset de départ (vidéo) en secondes |
+| `transitionToNext` | TransitionConfig | — | Transition vers le clip suivant |
+
+### TransitionConfig
+
+| Champ | Type | Défaut | Description |
+ | --- | --- | --- | --- |  
+| `type` | TransitionType | — | Nom de la transition |
+| `timing` | `"linear"` \| `"spring"` | `"linear"` | Type d'animation |
+| `durationInFrames` | number | défaut du fichier | Durée (linear uniquement) |
+| `damping` | number | 200 | Amorti du ressort (spring uniquement) |
+
+### Transitions disponibles
+
+| Nom | Description |
+ | --- | --- |  
+| `whiteFade` | Fondu blanc |
+| `swipeLeft` | Glissement depuis la droite |
+| `swipeRight` | Glissement depuis la gauche |
+| `swipeUp` | Glissement depuis le bas |
+| `swipeDown` | Glissement depuis le haut |
+
+---
 
 ## Démarrage (Docker Compose)
 
 ### 1) Créer les dossiers locaux
 
-`mkdir .\output -Force | Out-Null`
-`mkdir .\chrome-cache -Force | Out-Null`
+```powershell
+mkdir .\output -Force | Out-Null
+mkdir .\chrome-cache -Force | Out-Null
+```
 
 ### 2) Lancer le serveur
 
-`docker compose up --build`
+```powershell
+docker compose up --build
+```
 
 Le serveur écoute sur <http://localhost:3000>.
 
 ### 3) Arrêter
 
-`docker compose down`
+```powershell
+docker compose down
+```
 
-## Tester un rendu (curl PowerShell)
+---
 
-Dans un autre PowerShell :
+## Tester un rendu (PowerShell)
 
-curl -Method POST <http://localhost:3000/render> `
--Headers @{"Content-Type"="application/json"} `
+### Sans transition (cut)
+
+```powershell
+Invoke-RestMethod -Uri "http://localhost:3000/render" `
+  -Method POST `
+  -ContentType "application/json" `
   -Body '{
-    "scenes": [
-      {
-        "id": "s1",
-        "type": "image",
-        "url": "https://media.charentelibre.fr/19080144/1000x625/grand-angouleme-72c6ce6c1f1847768d9e6e868a861c16-103907-ph0.jpg?v=1711444825",
-        "duration": 4
-      },
-      {
-        "id": "s2",
-        "type": "video",
-        "url": "https://dirkemlfbqaybvddeeis.supabase.co/storage/v1/object/public/assets/1/tournoi.mp4",
-        "duration": 6,
-        "trimStart": 0
-      }
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "clips": [
+      { "id": "clip-1", "type": "image", "url": "https://sentience.pm/assets/img/poster.jpg", "duration": 2.0 },
+      { "id": "clip-2", "type": "video", "url": "https://cdn.pixabay.com/video/2024/10/12/236095_small.mp4", "duration": 3.0, "trimStart": 0 }
     ]
   }'
+```
 
-### Réponse attendue (exemple)
+### Fondu blanc
 
-  `{ "success": true, "output": "/app/out/video-XXXXXXXXXXXX.mp4" }`
+```powershell
+Invoke-RestMethod -Uri "http://localhost:3000/render" `
+  -Method POST `
+  -ContentType "application/json" `
+  -Body '{
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "clips": [
+      { "id": "clip-1", "type": "image", "url": "https://sentience.pm/assets/img/poster.jpg", "duration": 3.0, "transitionToNext": { "type": "whiteFade", "timing": "linear", "durationInFrames": 20 } },
+      { "id": "clip-2", "type": "video", "url": "https://cdn.pixabay.com/video/2024/10/12/236095_small.mp4", "duration": 3.0, "trimStart": 0 }
+    ]
+  }'
+```
 
-Le fichier .mp4 doit apparaître dans `./output/.`
+### Swipe
+
+```powershell
+Invoke-RestMethod -Uri "http://localhost:3000/render" `
+  -Method POST `
+  -ContentType "application/json" `
+  -Body '{
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "clips": [
+      { "id": "clip-1", "type": "video", "url": "https://cdn.pixabay.com/video/2024/10/12/236095_small.mp4", "duration": 3.0, "trimStart": 0, "transitionToNext": { "type": "swipeLeft", "timing": "spring", "damping": 200 } },
+      { "id": "clip-2", "type": "video", "url": "https://cdn.pixabay.com/video/2025/08/18/298103_small.mp4", "duration": 3.0, "trimStart": 0 }
+    ]
+  }'
+```
+
+### Réponse attendue
+
+```json
+{ "success": true, "output": "/app/out/video-XXXXXXXXXXXX.mp4" }
+```
+
+Le fichier `.mp4` apparaît dans `./output/`.
+
+---
 
 ## Volumes & Cache
 
-`./output:/app/out` : récupère les mp4 rendus
+| Volume | Description |
+ | --- | --- |  
+| `./output:/app/out` | Récupère les mp4 rendus |
+| `./chrome-cache:/app/.remotion-browser-cache` | Cache Chromium |
 
-`./chrome-cache:/app/.remotion-browser-cache` : cache Chromium (évite les re-download)
+### Variables d'env
 
-### Variables d’env (déjà dans le compose)
+```powershell
+REMOTION_CHROME_CACHE_DIR=/app/.remotion-browser-cache
+PUPPETEER_CACHE_DIR=/app/.remotion-browser-cache
+```
 
-`REMOTION_CHROME_CACHE_DIR=/app/.remotion-browser-cache`
-
-`PUPPETEER_CACHE_DIR=/app/.remotion-browser-cache`
+---
 
 ## Troubleshooting
 
 ### 1) Vidéo noire / médias non chargés
 
-- Vérifie que les fichiers sont bien téléchargés dans public/assets (dans le container).
-- Vérifie que Composition.tsx utilise staticFile() quand url commence par /.
+- Vérifie que les fichiers sont bien téléchargés dans `public/assets` (dans le container).
+- Vérifie que `Composition.tsx` utilise `staticFile()` quand `url` commence par `/`.
 
-### 2) Erreurs type Can't resolve 'path' / bundler
+### 2) Erreurs type `Can't resolve 'path'` / bundler
 
-- Ne jamais importer express, fs, path, @remotion/bundler, @remotion/renderer dans les fichiers React (ex: src/compositions/**).
-
-- Ces imports doivent rester côté serveur (src/server.ts, src/services/**).
+- Ne jamais importer `express`, `fs`, `path`, `@remotion/bundler`, `@remotion/renderer` dans les fichiers React (`src/compositions/**`).
+- Ces imports doivent rester côté serveur (`src/server.ts`, `src/services/**`).
 
 ### 3) Chromium retéléchargé à chaque render
 
-- Vérifie que le volume ./chrome-cache:/app/.remotion-browser-cache est bien monté.
+- Vérifie que le volume `./chrome-cache:/app/.remotion-browser-cache` est bien monté.
+- Vérifie les variables `REMOTION_CHROME_CACHE_DIR` / `PUPPETEER_CACHE_DIR`.
 
-- Vérifie les variables REMOTION_CHROME_CACHE_DIR / PUPPETEER_CACHE_DIR.
+---
 
 ## Commandes utiles
 
-- Voir les mp4 générés :
+Voir les mp4 générés :
 
-`Get-ChildItem .\output\ -Filter *.mp4 | Sort-Object LastWriteTime -Descending | Select-Object -First 5 Name,Length,LastWriteTime`
+```powershell
+Get-ChildItem .\output\ -Filter *.mp4 | Sort-Object LastWriteTime -Descending | Select-Object -First 5 Name,Length,LastWriteTime
+```
 
-- Logs :
+Logs :
 
-`docker compose logs -f`
+```powershell
+docker compose logs -f
+```

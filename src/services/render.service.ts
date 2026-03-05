@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { getCompositions, renderMedia } from "@remotion/renderer";
 
-type Scene = {
+type MediaClip = {
   id: string;
   type: "image" | "video";
   url: string;
@@ -11,11 +11,14 @@ type Scene = {
 };
 
 export type RenderRequestBody = {
-  scenes?: Scene[];
+  clips?: MediaClip[];
   audio?: {
     musicUrl: string;
     volume?: number;
   };
+  width?: number;
+  height?: number;
+  fps?: number;
 };
 
 export const renderVideo = async (args: {
@@ -24,16 +27,18 @@ export const renderVideo = async (args: {
 }): Promise<{ outputLocation: string }> => {
   const { serveUrl, inputProps } = args;
 
-  const scenes = inputProps.scenes ?? [];
-  if (!Array.isArray(scenes) || scenes.length === 0) {
-    throw new Error("No scenes provided");
+  if (!Array.isArray(inputProps.clips) || inputProps.clips.length === 0) {
+    throw new Error("No clips provided");
+  }
+  
+
+  // calculateMetadata dans Root.tsx gère la durée, width et height
+  const compositions = await getCompositions(serveUrl, { inputProps });
+  const composition = compositions.find((c) => c.id === "VideoComposition");
+  if (!composition) {
+    throw new Error("Composition 'VideoComposition' not found");
   }
 
-  const compositions = await getCompositions(serveUrl, { inputProps });
-  const composition = compositions.find((c) => c.id === "MyComp");
-  if (!composition) {
-    throw new Error("Composition 'MyComp' not found");
-  }
 
   const outputDir = path.resolve("./out");
   if (!fs.existsSync(outputDir)) {
@@ -42,12 +47,8 @@ export const renderVideo = async (args: {
 
   const outputLocation = path.join(outputDir, `video-${Date.now()}.mp4`);
 
-  const fps = composition.fps;
-  const totalDurationInSeconds = scenes.reduce((acc, s) => acc + s.duration, 0);
-  const totalDurationInFrames = Math.max(1, Math.floor(totalDurationInSeconds * fps));
-
   await renderMedia({
-    composition: { ...composition, durationInFrames: totalDurationInFrames },
+    composition,
     serveUrl,
     codec: "h264",
     outputLocation,
