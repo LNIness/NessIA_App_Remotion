@@ -5,16 +5,14 @@ export const calculateTotalFrames = (clips: any[], fps: number): number => {
 
   return clips.reduce((acc, clip, i) => {
     const clipFrames = Math.round((clip.duration || 0) * fps);
-
     let overlap = 0;
     const transition = clip.transitionToNext;
     const isNotLastClip = i < clips.length - 1;
 
     if (transition && isNotLastClip) {
       const transitionConfig = MyTransitions[transition.type as keyof typeof MyTransitions];
-      if (transitionConfig?.timing) {
-        overlap = transitionConfig.timing.getDurationInFrames({ fps });
-      }
+      overlap = transition.durationInFrames
+        ?? (transitionConfig?.timing?.getDurationInFrames({ fps }) ?? 0);
     }
 
     return acc + clipFrames - overlap;
