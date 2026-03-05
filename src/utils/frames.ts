@@ -10,9 +10,14 @@ export const calculateTotalFrames = (clips: any[], fps: number): number => {
     const isNotLastClip = i < clips.length - 1;
 
     if (transition && isNotLastClip) {
-      const transitionConfig = MyTransitions[transition.type as keyof typeof MyTransitions];
-      overlap = transition.durationInFrames
-        ?? (transitionConfig?.timing?.getDurationInFrames({ fps }) ?? 0);
+      if (transition.timing === "spring") {
+        // springTiming n'a pas de durée fixe, on utilise durationInFrames si fourni
+        overlap = transition.durationInFrames ?? 0;
+      } else {
+        const transitionConfig = MyTransitions[transition.type as keyof typeof MyTransitions];
+        overlap = transition.durationInFrames
+          ?? (transitionConfig?.timing?.getDurationInFrames({ fps }) ?? 0);
+      }
     }
 
     return acc + clipFrames - overlap;

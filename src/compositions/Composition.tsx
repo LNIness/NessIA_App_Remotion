@@ -5,9 +5,16 @@ import {
   staticFile,
   useVideoConfig,
 } from "remotion";
-import { TransitionSeries, linearTiming } from "@remotion/transitions";
+import { TransitionSeries, linearTiming, springTiming } from "@remotion/transitions";
 import { Audio, Video } from "@remotion/media";
 import { MyTransitions, TransitionType } from "../components/transitions";
+
+type TransitionConfig = {
+  type: TransitionType;
+  timing?: "linear" | "spring";
+  durationInFrames?: number;
+  damping?: number;
+};
 
 type MediaClip = {
   id: string;
@@ -15,10 +22,7 @@ type MediaClip = {
   url: string;
   duration: number;
   trimStart?: number;
-  transitionToNext?: {
-    type: TransitionType;
-    durationInFrames?: number;
-  };
+  transitionToNext?: TransitionConfig;
 };
 
 type VideoCompositionProps = {
@@ -29,6 +33,16 @@ type VideoCompositionProps = {
   };
   width?: number;
   height?: number;
+};
+
+const buildTiming = (transition: TransitionConfig, fps: number) => {
+  if (transition.timing === "spring") {
+    return springTiming({ config: { damping: transition.damping ?? 200 } });
+  }
+  return linearTiming({
+    durationInFrames: transition.durationInFrames
+      ?? MyTransitions[transition.type].timing.getDurationInFrames({ fps }),
+  });
 };
 
 export const VideoComposition: React.FC<VideoCompositionProps> = (props) => {
@@ -44,10 +58,6 @@ export const VideoComposition: React.FC<VideoCompositionProps> = (props) => {
           const trimBeforeFrames = clip.trimStart !== undefined ? Math.floor(clip.trimStart * fps) : 0;
           const transition = clip.transitionToNext;
           const isNotLastClip = i < clips.length - 1;
-
-          // Durée de la transition : depuis la requête ou valeur par défaut du fichier de transition
-          const transitionDuration = transition?.durationInFrames
-            ?? (transition ? MyTransitions[transition.type].timing.getDurationInFrames({ fps }) : 0);
 
           return (
             <React.Fragment key={clip.id}>
@@ -71,7 +81,7 @@ export const VideoComposition: React.FC<VideoCompositionProps> = (props) => {
               {transition && isNotLastClip ? (
                 <TransitionSeries.Transition
                   presentation={MyTransitions[transition.type].presentation}
-                  timing={linearTiming({ durationInFrames: transitionDuration })}
+                  timing={buildTiming(transition, fps)}
                 />
               ) : null}
             </React.Fragment>
