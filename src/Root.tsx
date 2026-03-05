@@ -1,6 +1,6 @@
 import React from "react";
 import { Composition } from "remotion";
-import { MyComp } from "./compositions/Composition";
+import { VideoComposition } from "./compositions/Composition";
 import { MyTransitions } from "./components/transitions";
 
 export const RemotionRoot: React.FC = () => {
@@ -8,38 +8,36 @@ export const RemotionRoot: React.FC = () => {
 
   return (
     <Composition
-      id="MyComp"
-      component={MyComp}
+      id="VideoComposition"
+      component={VideoComposition}
       fps={fps}
       width={1080}
       height={1920}
       defaultProps={{
-        scenes: [] as any[],
+        clips: [] as any[],
       }}
-      // Correction ici : on utilise 'props' au lieu de 'inputProps'
       calculateMetadata={({ props }) => {
-        const scenes = (props.scenes as any[]) || [];
-        
-        if (scenes.length === 0) {
+        const clips = (props.clips as any[]) || [];
+
+        if (clips.length === 0) {
           return { durationInFrames: fps };
         }
 
-        const totalFrames = scenes.reduce((acc, scene, i) => {
-          const sceneFrames = Math.round((scene.duration || 0) * fps);
-          
-          let overlap = 0;
-          const transition = scene.transitionToNext;
-          const isNotLastScene = i < scenes.length - 1;
+        const totalFrames = clips.reduce((acc, clip, i) => {
+          const clipFrames = Math.round((clip.duration || 0) * fps);
 
-          if (transition && isNotLastScene) {
+          let overlap = 0;
+          const transition = clip.transitionToNext;
+          const isNotLastClip = i < clips.length - 1;
+
+          if (transition && isNotLastClip) {
             const transitionConfig = MyTransitions[transition.type as keyof typeof MyTransitions];
             if (transitionConfig && transitionConfig.timing) {
-              // LA CORRECTION : passage par un objet
               overlap = transitionConfig.timing.getDurationInFrames({ fps });
             }
           }
 
-          return acc + sceneFrames - overlap;
+          return acc + clipFrames - overlap;
         }, 0);
 
         return {
