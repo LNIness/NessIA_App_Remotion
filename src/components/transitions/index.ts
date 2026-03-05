@@ -1,9 +1,12 @@
 import { whiteFade } from './fade';
-import { swipeLeft } from './slide';
+import { swipeLeft, swipeRight, swipeUp, swipeDown } from './slide';
 
 export const MyTransitions = {
-  swipeLeft,
   whiteFade,
+  swipeLeft,
+  swipeRight,
+  swipeUp,
+  swipeDown,
 };
 
 export type TransitionType = keyof typeof MyTransitions;

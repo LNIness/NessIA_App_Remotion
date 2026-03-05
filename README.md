@@ -50,7 +50,9 @@ Les médias distants (image/vidéo) sont téléchargés dans `public/assets` pou
       "duration": 5.0,
       "trimStart": 0,
       "transitionToNext": {
-        "type": "whiteFade"
+        "type": "whiteFade",
+        "timing": "linear",
+        "durationInFrames": 20
       }
     }
   ],
@@ -61,7 +63,7 @@ Les médias distants (image/vidéo) sont téléchargés dans `public/assets` pou
 }
 ```
 
-### Champs
+### Champs racine
 
 | Champ | Type | Défaut | Description |
  | --- | --- | --- | --- |  
@@ -81,14 +83,26 @@ Les médias distants (image/vidéo) sont téléchargés dans `public/assets` pou
 | `url` | string | ✅ | URL externe ou `/assets/...` |
 | `duration` | number | ✅ | Durée en secondes |
 | `trimStart` | number | — | Offset de départ (vidéo) en secondes |
-| `transitionToNext` | `{ type: TransitionType }` | — | Transition vers le clip suivant |
+| `transitionToNext` | TransitionConfig | — | Transition vers le clip suivant |
+
+### TransitionConfig
+
+| Champ | Type | Défaut | Description |
+ | --- | --- | --- | --- |  
+| `type` | TransitionType | — | Nom de la transition |
+| `timing` | `"linear"` \| `"spring"` | `"linear"` | Type d'animation |
+| `durationInFrames` | number | défaut du fichier | Durée (linear uniquement) |
+| `damping` | number | 200 | Amorti du ressort (spring uniquement) |
 
 ### Transitions disponibles
 
 | Nom | Description |
  | --- | --- |  
 | `whiteFade` | Fondu blanc |
-| `swipeLeft` | Glissement de droite à gauche |
+| `swipeLeft` | Glissement depuis la droite |
+| `swipeRight` | Glissement depuis la gauche |
+| `swipeUp` | Glissement depuis le bas |
+| `swipeDown` | Glissement depuis le haut |
 
 ---
 
@@ -119,6 +133,8 @@ docker compose down
 
 ## Tester un rendu (PowerShell)
 
+### Sans transition (cut)
+
 ```powershell
 Invoke-RestMethod -Uri "http://localhost:3000/render" `
   -Method POST `
@@ -128,8 +144,42 @@ Invoke-RestMethod -Uri "http://localhost:3000/render" `
     "height": 1920,
     "fps": 30,
     "clips": [
-      { "id": "clip-1", "type": "image", "url": "https://sentience.pm/assets/img/poster.jpg", "duration": 2.1 },
-      { "id": "clip-2", "type": "video", "url": "https://cdn.pixabay.com/video/2024/10/12/236095_small.mp4", "duration": 1.9, "trimStart": 0 }
+      { "id": "clip-1", "type": "image", "url": "https://sentience.pm/assets/img/poster.jpg", "duration": 2.0 },
+      { "id": "clip-2", "type": "video", "url": "https://cdn.pixabay.com/video/2024/10/12/236095_small.mp4", "duration": 3.0, "trimStart": 0 }
+    ]
+  }'
+```
+
+### Fondu blanc
+
+```powershell
+Invoke-RestMethod -Uri "http://localhost:3000/render" `
+  -Method POST `
+  -ContentType "application/json" `
+  -Body '{
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "clips": [
+      { "id": "clip-1", "type": "image", "url": "https://sentience.pm/assets/img/poster.jpg", "duration": 3.0, "transitionToNext": { "type": "whiteFade", "timing": "linear", "durationInFrames": 20 } },
+      { "id": "clip-2", "type": "video", "url": "https://cdn.pixabay.com/video/2024/10/12/236095_small.mp4", "duration": 3.0, "trimStart": 0 }
+    ]
+  }'
+```
+
+### Swipe
+
+```powershell
+Invoke-RestMethod -Uri "http://localhost:3000/render" `
+  -Method POST `
+  -ContentType "application/json" `
+  -Body '{
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "clips": [
+      { "id": "clip-1", "type": "video", "url": "https://cdn.pixabay.com/video/2024/10/12/236095_small.mp4", "duration": 3.0, "trimStart": 0, "transitionToNext": { "type": "swipeLeft", "timing": "spring", "damping": 200 } },
+      { "id": "clip-2", "type": "video", "url": "https://cdn.pixabay.com/video/2025/08/18/298103_small.mp4", "duration": 3.0, "trimStart": 0 }
     ]
   }'
 ```
@@ -147,7 +197,7 @@ Le fichier `.mp4` apparaît dans `./output/`.
 ## Volumes & Cache
 
 | Volume | Description |
-| --- | --- |  
+ | --- | --- |  
 | `./output:/app/out` | Récupère les mp4 rendus |
 | `./chrome-cache:/app/.remotion-browser-cache` | Cache Chromium |
 
