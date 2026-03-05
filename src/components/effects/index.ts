@@ -1,0 +1,1 @@
+export type { ZoomEffect } from './zoom';
