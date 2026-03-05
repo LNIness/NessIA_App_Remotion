@@ -1,0 +1,28 @@
+import React from "react";
+import { AbsoluteFill, Img, staticFile } from "remotion";
+import { Video } from "@remotion/media";
+import { MediaClip } from "./types";
+import { useZoomStyle } from "../utils/zoom";
+
+export const ClipRenderer: React.FC<{ clip: MediaClip; durationInFrames: number }> = ({ clip, durationInFrames }) => {
+  const src = clip.url.startsWith("/") ? staticFile(clip.url) : clip.url;
+  const zoomStyle = clip.effect ? useZoomStyle(clip.effect, durationInFrames) : {};
+  const trimBeforeFrames = clip.trimStart !== undefined ? Math.floor(clip.trimStart * 30) : 0;
+
+  return (
+    <AbsoluteFill style={{ overflow: "hidden" }}>
+      {clip.type === "image" ? (
+        <Img
+          src={src}
+          style={{ width: "100%", height: "100%", objectFit: "cover", ...zoomStyle }}
+        />
+      ) : (
+        <Video
+          src={src}
+          trimBefore={trimBeforeFrames}
+          style={{ width: "100%", height: "100%", objectFit: "cover", ...zoomStyle }}
+        />
+      )}
+    </AbsoluteFill>
+  );
+};
