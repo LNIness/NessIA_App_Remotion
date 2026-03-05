@@ -23,6 +23,8 @@ type VideoCompositionProps = {
     musicUrl: string;
     volume?: number;
   };
+  width?: number;
+  height?: number;
 };
 
 export const VideoComposition: React.FC<VideoCompositionProps> = (props) => {
