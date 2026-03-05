@@ -29,14 +29,13 @@ app.post("/render", async (req, res) => {
       }
     }
 
-    console.log("SCENES:", inputProps.scenes);
-
-    // 2) Bundle
+    // 2) Bundle le projet Remotion
     const bundleLocation = await bundle({
       entryPoint: path.resolve("./src/index.ts"),
     });
 
-    // 3) Compositions
+    // 3) Récupérer la composition
+    // Grâce à calculateMetadata dans Root.tsx, cette étape calcule la durée réelle
     const compositions = await getCompositions(bundleLocation, { inputProps });
     const composition = compositions.find((c) => c.id === "MyComp");
 
@@ -44,31 +43,21 @@ app.post("/render", async (req, res) => {
       throw new Error("Composition 'MyComp' not found");
     }
 
-    // 4) Output
+    // Log pour debug : vérifie si la durée correspond à tes attentes
+    console.log(`Rendering ${composition.id}: ${composition.durationInFrames} frames at ${composition.fps}fps`);
+
+    // 4) Préparer le dossier de sortie
     const outputDir = path.resolve("./out");
     if (!fs.existsSync(outputDir)) {
       fs.mkdirSync(outputDir, { recursive: true });
     }
-
     const outputLocation = path.join(outputDir, `video-${Date.now()}.mp4`);
 
-    // 5) Durée
-    const fps = composition.fps;
-    const totalDurationInSeconds = (inputProps.scenes ?? []).reduce(
-      (acc: number, scene: any) => acc + (scene?.duration ?? 0),
-      0
-    );
-    const totalDurationInFrames = Math.max(1, Math.floor(totalDurationInSeconds * fps));
-
-    console.log("TOTAL SECONDS:", totalDurationInSeconds);
-    console.log("TOTAL FRAMES:", totalDurationInFrames);
-
-    // 6) Render
+    // 5) Rendu
+    // On passe l'objet composition tel quel.
+// 6) Render
     await renderMedia({
-      composition: {
-        ...composition,
-        durationInFrames: totalDurationInFrames,
-      },
+      composition: composition, 
       serveUrl: bundleLocation,
       codec: "h264",
       outputLocation,
@@ -76,6 +65,8 @@ app.post("/render", async (req, res) => {
       chromiumOptions: {
         disableWebSecurity: true,
         ignoreCertificateErrors: true,
+        // On retire 'args' qui n'existe pas dans le type ChromiumOptions
+        // Remotion gère déjà l'essentiel en interne.
       },
     });
 

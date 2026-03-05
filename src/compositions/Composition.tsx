@@ -1,113 +1,65 @@
 import React from "react";
 import {
   AbsoluteFill,
-  Audio,
   Img,
-  Video,
+  Sequence,
   staticFile,
   useVideoConfig,
 } from "remotion";
 
-// ✅ Correct Remotion v4 imports
-import { TransitionSeries, linearTiming } from "@remotion/transitions";
-import { fade } from "@remotion/transitions/fade";
-import { wipe } from "@remotion/transitions/wipe";
+import { Audio, Video } from "@remotion/media";
 
-type Transition =
-  | { type: "whiteFlash"; preset?: "ultraFast" }
-  | { type: "whiteFade"; preset?: "ultraFast" }
-  | { type: "swipeLeft"; preset?: "ultraFast" }
-  | { type: "zoom"; preset?: "ultraFast"; params?: { scale?: number } };
-
-type Scene = {
+type MediaClip = {
   id: string;
   type: "image" | "video";
-  url: string; // URL externe OU "/assets/xxx"
-  duration: number; // secondes
-  trimStart?: number; // secondes
-  transitionToNext?: Transition; // NEW
+  url: string;
+  duration: number;
+  trimStart?: number;
 };
 
-type VideoProject = {
-  scenes?: Scene[];
+type VideoCompositionProps = {
+  clips?: MediaClip[];
   audio?: {
-    musicUrl: string; // URL externe OU "/assets/xxx"
+    musicUrl: string;
     volume?: number;
   };
 };
 
-export const MyComp: React.FC<VideoProject> = (props) => {
+export const VideoComposition: React.FC<VideoCompositionProps> = (props) => {
   const { fps } = useVideoConfig();
-  const scenes = props.scenes ?? [];
+  const clips = props.clips ?? [];
 
-  // Ultra-rapide implicite (sans durée dans le JSON)
-  const ULTRA_FAST_FRAMES = 4;
-  const ultraFast = linearTiming({ durationInFrames: ULTRA_FAST_FRAMES });
-
-  const renderSceneContent = (scene: Scene) => {
-    const src = scene.url.startsWith("/") ? staticFile(scene.url) : scene.url;
-    const trimStartFrames =
-      scene.trimStart !== undefined ? Math.floor(scene.trimStart * fps) : 0;
-
-    return scene.type === "image" ? (
-      <Img
-        src={src}
-        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-      />
-    ) : (
-      <Video
-        src={src}
-        startFrom={trimStartFrames}
-        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-      />
-    );
-  };
-
-  const toPresentation = (t: Transition) => {
-    switch (t.type) {
-      case "whiteFade":
-        return fade(); // ok :contentReference[oaicite:3]{index=3}
-
-      case "swipeLeft":
-        // Pour un "swipe vers la gauche", le plan entrant vient de la droite
-        return wipe({ direction: "from-right" }); // directions doc :contentReference[oaicite:4]{index=4}
-
-      case "whiteFlash":
-        // Fallback (étape suivante: vrai flash blanc via custom/overlay)
-        return fade();
-
-      case "zoom":
-        // Fallback (étape suivante: vrai zoom via custom presentation)
-        return fade();
-
-      default:
-        return fade();
-    }
-  };
+  let accumulatedFrames = 0;
 
   return (
     <AbsoluteFill style={{ backgroundColor: "black" }}>
-      <TransitionSeries>
-        {scenes.map((scene, i) => {
-          const durationInFrames = Math.max(1, Math.floor(scene.duration * fps));
-          const transition = scene.transitionToNext;
+      {clips.map((clip) => {
+        const src = clip.url.startsWith("/") ? staticFile(clip.url) : clip.url;
 
-          return (
-            <React.Fragment key={scene.id}>
-              <TransitionSeries.Sequence durationInFrames={durationInFrames}>
-                {renderSceneContent(scene)}
-              </TransitionSeries.Sequence>
+        const durationInFrames = Math.max(1, Math.floor(clip.duration * fps));
+        const from = accumulatedFrames;
+        accumulatedFrames += durationInFrames;
 
-              {transition && i < scenes.length - 1 ? (
-                <TransitionSeries.Transition
-                  timing={ultraFast}
-                  presentation={toPresentation(transition) as unknown as Parameters<typeof TransitionSeries.Transition>[0]["presentation"]}
-                />
-              ) : null}
-            </React.Fragment>
-          );
-        })}
-      </TransitionSeries>
+        const trimBeforeFrames =
+          clip.trimStart !== undefined ? Math.floor(clip.trimStart * fps) : 0;
+
+        return (
+          <Sequence key={clip.id} from={from} durationInFrames={durationInFrames}>
+            {clip.type === "image" ? (
+              <Img
+                src={src}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            ) : (
+              <Video
+                src={src}
+                trimBefore={trimBeforeFrames}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            )}
+          </Sequence>
+        );
+      })}
 
       {props.audio?.musicUrl ? (
         <Audio
