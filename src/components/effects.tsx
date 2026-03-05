@@ -1,0 +1,1 @@
+//Composant d'effets
