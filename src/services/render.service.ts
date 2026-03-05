@@ -30,7 +30,6 @@ export const renderVideo = async (args: {
   if (!Array.isArray(inputProps.clips) || inputProps.clips.length === 0) {
     throw new Error("No clips provided");
   }
-  
 
   // calculateMetadata dans Root.tsx gère la durée, width et height
   const compositions = await getCompositions(serveUrl, { inputProps });
@@ -39,6 +38,7 @@ export const renderVideo = async (args: {
     throw new Error("Composition 'VideoComposition' not found");
   }
 
+  console.log(`Rendering ${composition.id}: ${composition.durationInFrames} frames at ${composition.fps}fps — ${composition.width}x${composition.height}`);
 
   const outputDir = path.resolve("./out");
   if (!fs.existsSync(outputDir)) {
@@ -56,6 +56,7 @@ export const renderVideo = async (args: {
     chromiumOptions: {
       disableWebSecurity: true,
       ignoreCertificateErrors: true,
+      gl: "swiftshader",
     },
   });
 
