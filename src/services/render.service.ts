@@ -1,25 +1,9 @@
 import fs from "fs";
 import path from "path";
 import { getCompositions, renderMedia } from "@remotion/renderer";
+import { VideoCompositionProps } from "../compositions/types";
 
-type MediaClip = {
-  id: string;
-  type: "image" | "video";
-  url: string;
-  duration: number;
-  trimStart?: number;
-};
-
-export type RenderRequestBody = {
-  clips?: MediaClip[];
-  audio?: {
-    musicUrl: string;
-    volume?: number;
-  };
-  width?: number;
-  height?: number;
-  fps?: number;
-};
+export type RenderRequestBody = VideoCompositionProps;
 
 export const renderVideo = async (args: {
   serveUrl: string;
