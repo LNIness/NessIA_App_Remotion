@@ -3,10 +3,11 @@ import { bundle } from "@remotion/bundler";
 import path from "path";
 import { downloadMediaToPublic } from "./services/download.service";
 import { renderVideo } from "./services/render.service";
+import { setupMcp } from "./mcp";
 
 const app = express();
 app.use(express.json({ limit: "50mb" }));
-
+setupMcp(app);
 const PORT = 3000;
 
 app.get("/", (_req, res) => {
