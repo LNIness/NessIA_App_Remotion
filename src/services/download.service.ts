@@ -8,8 +8,7 @@ const PUBLIC_ASSETS_DIR = path.resolve("./public/assets");
  * Télécharge un média distant et l’écrit dans public/assets.
  * Retourne un chemin relatif compatible Remotion: "/assets/xxx.ext"
  */
-export const downloadMediaToPublic = async (url: string, index: number): Promise<string> => {
-  if (!url || typeof url !== "string") {
+export const downloadMediaToPublic = async (url: string, index: number | string): Promise<string> => {  if (!url || typeof url !== "string") {
     throw new Error("downloadMediaToPublic: url manquante ou invalide");
   }
 
