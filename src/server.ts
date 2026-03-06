@@ -29,12 +29,18 @@ app.post("/render", async (req, res) => {
       }
     }
 
-    // 2) Bundle le projet Remotion
+    // 2) Télécharger la musique si URL externe
+    if (inputProps.audio?.musicUrl && !inputProps.audio.musicUrl.startsWith("/assets/")) {
+      const newUrl = await downloadMediaToPublic(inputProps.audio.musicUrl, "music");
+      inputProps.audio.musicUrl = newUrl;
+    }
+
+    // 3) Bundle le projet Remotion
     const bundleLocation = await bundle({
       entryPoint: path.resolve("./src/index.ts"),
     });
 
-    // 3) Rendu via le service
+    // 4) Rendu via le service
     const { outputLocation } = await renderVideo({
       serveUrl: bundleLocation,
       inputProps,
