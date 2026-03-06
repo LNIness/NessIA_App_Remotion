@@ -6,6 +6,7 @@
   "license": "UNLICENSED",
   "private": true,
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "@remotion/cli": "4.0.423",
     "@remotion/media": "4.0.423",
     "@remotion/studio": "4.0.423",

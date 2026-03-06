@@ -1,0 +1,8 @@
+{
+  "servers": {
+    "remotion-render": {
+      "type": "http",
+      "url": "http://localhost:3000/mcp"
+    }
+  }
+}
