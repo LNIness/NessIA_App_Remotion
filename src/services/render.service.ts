@@ -30,7 +30,7 @@ export const renderVideo = async (args: {
   }
 
   const outputLocation = path.join(outputDir, `video-${Date.now()}.mp4`);
-
+  
   await renderMedia({
     composition,
     serveUrl,

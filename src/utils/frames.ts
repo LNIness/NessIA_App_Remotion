@@ -11,8 +11,17 @@ export const calculateTotalFrames = (clips: any[], fps: number): number => {
 
     if (transition && isNotLastClip) {
       if (transition.timing === "spring") {
-        // springTiming dure ~0.8s par défaut — utiliser durationInFrames si fourni
-        overlap = transition.durationInFrames ?? Math.round(fps * 0.8);
+        if (transition.durationInFrames) {
+          overlap = transition.durationInFrames;
+        } else {
+          const damping = transition.damping ?? 200;
+          // Plus le damping est élevé, plus le spring est court
+          if (damping <= 100) overlap = Math.round(fps * 1.2);
+          else if (damping <= 150) overlap = Math.round(fps * 0.8);
+          else if (damping <= 200) overlap = Math.round(fps * 0.6);
+          else if (damping <= 300) overlap = Math.round(fps * 0.4);
+          else overlap = Math.round(fps * 0.3);
+        }
       } else {
         const transitionConfig = MyTransitions[transition.type as keyof typeof MyTransitions];
         overlap = transition.durationInFrames
