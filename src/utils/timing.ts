@@ -10,7 +10,8 @@ export const buildTiming = (transition: TransitionConfig, fps: number) => {
     else if (damping <= 150) durationInFrames = Math.round(fps * 0.8);
     else if (damping <= 200) durationInFrames = Math.round(fps * 0.6);
     else if (damping <= 300) durationInFrames = Math.round(fps * 0.4);
-    else durationInFrames = Math.round(fps * 0.3);
+    else if (damping <= 400) durationInFrames = Math.round(fps * 0.25);
+    else durationInFrames = Math.round(fps * 0.2);
 
     return springTiming({
       durationInFrames,
