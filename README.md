@@ -18,12 +18,19 @@ Les médias distants (image/vidéo) sont téléchargés dans `public/assets` pou
 
 ## Structure (résumé)
 
-- `src/server.ts` : API HTTP `/render`
+- `src/server.ts` : API HTTP `/render` et `/mcp`
+- `src/mcp.ts` : serveur MCP pour Copilot Agent (VS Code)
 - `src/Root.tsx` : point d'entrée Remotion, déclare les compositions
 - `src/compositions/Composition.tsx` : rendu des clips (React)
+- `src/compositions/ClipRenderer.tsx` : rendu d'un clip individuel avec effets
+- `src/compositions/AudioTrack.tsx` : rendu de la musique de fond
 - `src/compositions/VideoCompositionConfig.tsx` : config de la composition (durée, format, fps)
+- `src/compositions/types.ts` : types partagés (MediaClip, VideoCompositionProps...)
 - `src/components/transitions/` : transitions disponibles (`fade.ts`, `slide.ts`, `index.ts`)
+- `src/components/effects/` : effets disponibles (`zoom.ts`, `index.ts`)
 - `src/utils/frames.ts` : calcul de la durée totale en frames
+- `src/utils/timing.ts` : construction du timing des transitions
+- `src/utils/zoom.ts` : hook useZoomStyle
 - `src/services/download.service.ts` : download des médias vers `public/assets`
 - `src/services/render.service.ts` : orchestration du rendu Remotion
 - `public/assets/` : médias téléchargés (servis pendant le rendu)
@@ -41,19 +48,27 @@ Les médias distants (image/vidéo) sont téléchargés dans `public/assets` pou
       "id": "clip-1",
       "type": "image",
       "url": "https://...",
-      "duration": 3.0
+      "duration": 3.0,
+      "effect": {
+        "type": "kenBurns",
+        "fromX": 50,
+        "fromY": 50,
+        "toX": 65,
+        "toY": 35,
+        "intensity": 1.3
+      },
+      "transitionToNext": {
+        "type": "whiteFade",
+        "timing": "spring",
+        "damping": 200
+      }
     },
     {
       "id": "clip-2",
       "type": "video",
       "url": "https://...",
       "duration": 5.0,
-      "trimStart": 0,
-      "transitionToNext": {
-        "type": "whiteFade",
-        "timing": "linear",
-        "durationInFrames": 20
-      }
+      "trimStart": 0
     }
   ],
   "audio": {
@@ -66,7 +81,7 @@ Les médias distants (image/vidéo) sont téléchargés dans `public/assets` pou
 ### Champs racine
 
 | Champ | Type | Défaut | Description |
- | --- | --- | --- | --- |  
+| --- | --- | --- | --- |  
 | `width` | number | 1080 | Largeur en pixels |
 | `height` | number | 1920 | Hauteur en pixels |
 | `fps` | number | 30 | Images par seconde |
@@ -77,13 +92,14 @@ Les médias distants (image/vidéo) sont téléchargés dans `public/assets` pou
 ### MediaClip
 
 | Champ | Type | Requis | Description |
- | --- | --- | --- | --- |  
+ | --- | --- | --- | --- |
 | `id` | string | ✅ | Identifiant unique |
 | `type` | `"image"` \| `"video"` | ✅ | Type de média |
 | `url` | string | ✅ | URL externe ou `/assets/...` |
 | `duration` | number | ✅ | Durée en secondes |
 | `trimStart` | number | — | Offset de départ (vidéo) en secondes |
 | `transitionToNext` | TransitionConfig | — | Transition vers le clip suivant |
+| `effect` | EffectConfig | — | Effet visuel appliqué au clip |
 
 ### TransitionConfig
 
@@ -103,6 +119,17 @@ Les médias distants (image/vidéo) sont téléchargés dans `public/assets` pou
 | `swipeRight` | Glissement depuis la gauche |
 | `swipeUp` | Glissement depuis le bas |
 | `swipeDown` | Glissement depuis le haut |
+
+### EffectConfig
+
+| Champ | Type | Requis | Description |
+ | --- | --- | --- | --- |  
+| `type` | `"zoomIn"` \| `"zoomOut"` \| `"kenBurns"` | ✅ | Type d'effet |
+| `intensity` | number | 1.2 | Ampleur du zoom |
+| `fromX` | number | 50 | Position X départ (kenBurns) en % |
+| `fromY` | number | 50 | Position Y départ (kenBurns) en % |
+| `toX` | number | 60 | Position X arrivée (kenBurns) en % |
+| `toY` | number | 40 | Position Y arrivée (kenBurns) en % |
 
 ---
 
@@ -184,6 +211,23 @@ Invoke-RestMethod -Uri "http://localhost:3000/render" `
   }'
 ```
 
+### Effet zoom + transition
+
+```powershell
+Invoke-RestMethod -Uri "http://localhost:3000/render" `
+  -Method POST `
+  -ContentType "application/json" `
+  -Body '{
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "clips": [
+      { "id": "clip-1", "type": "image", "url": "https://sentience.pm/assets/img/poster.jpg", "duration": 4.0, "effect": { "type": "kenBurns", "fromX": 50, "fromY": 50, "toX": 65, "toY": 35, "intensity": 1.3 }, "transitionToNext": { "type": "whiteFade", "timing": "spring", "damping": 200 } },
+      { "id": "clip-2", "type": "video", "url": "https://cdn.pixabay.com/video/2024/10/12/236095_small.mp4", "duration": 4.0, "trimStart": 0, "effect": { "type": "zoomIn", "intensity": 1.2 } }
+    ]
+  }'
+```
+
 ### Réponse attendue
 
 ```json
@@ -191,6 +235,34 @@ Invoke-RestMethod -Uri "http://localhost:3000/render" `
 ```
 
 Le fichier `.mp4` apparaît dans `./output/`.
+
+---
+
+## MCP Server (Copilot Agent VS Code)
+
+Le serveur expose un endpoint MCP sur `/mcp` pour permettre à Copilot Agent de lancer des rendus en langage naturel.
+
+### Configuration `.vscode/mcp.json`
+
+```json
+{
+  "servers": {
+    "remotion-render": {
+      "type": "http",
+      "url": "http://localhost:3000/mcp"
+    }
+  }
+}
+```
+
+### Utilisation dans Copilot Agent
+
+```json
+Génère une vidéo avec ces deux clips :
+- https://... pendant 3 secondes
+- https://... pendant 3 secondes
+avec une transition whiteFade entre les deux, format 9:16
+```
 
 ---
 
@@ -203,7 +275,7 @@ Le fichier `.mp4` apparaît dans `./output/`.
 
 ### Variables d'env
 
-```powershell
+```json
 REMOTION_CHROME_CACHE_DIR=/app/.remotion-browser-cache
 PUPPETEER_CACHE_DIR=/app/.remotion-browser-cache
 ```
@@ -226,6 +298,10 @@ PUPPETEER_CACHE_DIR=/app/.remotion-browser-cache
 
 - Vérifie que le volume `./chrome-cache:/app/.remotion-browser-cache` est bien monté.
 - Vérifie les variables `REMOTION_CHROME_CACHE_DIR` / `PUPPETEER_CACHE_DIR`.
+
+### 4) Écran noir en fin de vidéo
+
+- Vérifier que `calculateTotalFrames` soustrait bien l'overlap des transitions spring (~0.8s par défaut).
 
 ---
 

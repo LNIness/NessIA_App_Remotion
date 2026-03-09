@@ -3,10 +3,11 @@ import { bundle } from "@remotion/bundler";
 import path from "path";
 import { downloadMediaToPublic } from "./services/download.service";
 import { renderVideo } from "./services/render.service";
+import { setupMcp } from "./mcp";
 
 const app = express();
 app.use(express.json({ limit: "50mb" }));
-
+setupMcp(app);
 const PORT = 3000;
 
 app.get("/", (_req, res) => {
@@ -28,12 +29,18 @@ app.post("/render", async (req, res) => {
       }
     }
 
-    // 2) Bundle le projet Remotion
+    // 2) Télécharger la musique si URL externe
+    if (inputProps.audio?.musicUrl && !inputProps.audio.musicUrl.startsWith("/assets/")) {
+      const newUrl = await downloadMediaToPublic(inputProps.audio.musicUrl, "music");
+      inputProps.audio.musicUrl = newUrl;
+    }
+
+    // 3) Bundle le projet Remotion
     const bundleLocation = await bundle({
       entryPoint: path.resolve("./src/index.ts"),
     });
 
-    // 3) Rendu via le service
+    // 4) Rendu via le service
     const { outputLocation } = await renderVideo({
       serveUrl: bundleLocation,
       inputProps,
