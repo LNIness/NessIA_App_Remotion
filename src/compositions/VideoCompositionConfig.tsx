@@ -1,5 +1,6 @@
 import React from 'react';
 import { Composition } from 'remotion';
+import { TEST_PAYLOAD } from '../dev/testPayload';
 import { VideoComposition } from './Composition';
 import { calculateTotalFrames } from '../utils/frames';
 
@@ -20,12 +21,22 @@ export const VideoCompositionConfig: React.FC = () => {
       height={DEFAULTS.height}
       // defaultProps : utilisés uniquement en Remotion Studio pour la preview
       // En rendu API, calculateMetadata écrase ces valeurs avec celles de la requête
-      defaultProps={{
+      /**defaultProps={{
         clips: [] as any[],
         width: DEFAULTS.width,
         height: DEFAULTS.height,
         fps: DEFAULTS.fps,
-      }}
+      }}**/
+      defaultProps={
+        process.env.NODE_ENV === 'development'
+          ? TEST_PAYLOAD
+          : {
+              clips: [] as any[],
+              width: DEFAULTS.width,
+              height: DEFAULTS.height,
+              fps: DEFAULTS.fps,
+            }
+      }
       // calculateMetadata : calcule dynamiquement la durée, width et height depuis les props reçues
       calculateMetadata={({ props }) => {
         const clips = (props.clips as any[]) ?? [];
