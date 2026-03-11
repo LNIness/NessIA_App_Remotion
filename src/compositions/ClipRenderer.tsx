@@ -3,8 +3,12 @@ import { AbsoluteFill, Img, useVideoConfig } from 'remotion';
 import { Video } from '@remotion/media';
 import { MediaClip } from './types';
 import { useZoomStyle } from '../utils/zoom';
+import {
+  usePlaybackRate,
+  getEffectiveTrimAfter,
+} from '../components/effects/speed';
 
-// Rendu d'un clip individuel — gère images et vidéos avec effets et trimStart
+// Rendu d'un clip individuel — gère images et vidéos avec effets, trimStart et vitesse
 export const ClipRenderer: React.FC<{
   clip: MediaClip;
   durationInFrames: number;
@@ -23,10 +27,26 @@ export const ClipRenderer: React.FC<{
   const trimBeforeFrames =
     clip.trimStart !== undefined ? Math.round(clip.trimStart * fps) : 0;
 
+  // Calcul du playbackRate selon speed ou speedRamp (vidéo uniquement)
+  const playbackRate = usePlaybackRate(
+    durationInFrames,
+    clip.speed,
+    clip.speedRamp
+  );
+
+  // Calcul du trimAfter pour limiter la plage de rush consommée selon la vitesse
+  const trimAfterFrames = getEffectiveTrimAfter(
+    trimBeforeFrames,
+    durationInFrames,
+    fps,
+    clip.speed,
+    clip.speedRamp
+  );
+
   return (
     <AbsoluteFill style={{ overflow: 'hidden' }}>
       {clip.type === 'image' ? (
-        // Rendu image — pas de trimStart applicable
+        // Rendu image — speed ignoré (pas de playbackRate applicable sur une image)
         <Img
           src={src}
           style={{
@@ -38,9 +58,15 @@ export const ClipRenderer: React.FC<{
         />
       ) : (
         // Rendu vidéo — trimBefore pour démarrer dans le rush à l'offset souhaité
+        // playbackRate pour ralenti/accéléré/ramp
+        // trimAfter pour limiter la plage lue selon la vitesse
         <Video
           src={src}
           trimBefore={trimBeforeFrames}
+          {...(trimAfterFrames !== undefined
+            ? { trimAfter: trimAfterFrames }
+            : {})}
+          playbackRate={playbackRate}
           style={{
             width: '100%',
             height: '100%',
