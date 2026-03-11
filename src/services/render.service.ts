@@ -1,25 +1,9 @@
 import fs from "fs";
 import path from "path";
 import { getCompositions, renderMedia } from "@remotion/renderer";
+import { VideoCompositionProps } from "../compositions/types";
 
-type MediaClip = {
-  id: string;
-  type: "image" | "video";
-  url: string;
-  duration: number;
-  trimStart?: number;
-};
-
-export type RenderRequestBody = {
-  clips?: MediaClip[];
-  audio?: {
-    musicUrl: string;
-    volume?: number;
-  };
-  width?: number;
-  height?: number;
-  fps?: number;
-};
+export type RenderRequestBody = VideoCompositionProps;
 
 export const renderVideo = async (args: {
   serveUrl: string;
@@ -30,16 +14,17 @@ export const renderVideo = async (args: {
   if (!Array.isArray(inputProps.clips) || inputProps.clips.length === 0) {
     throw new Error("No clips provided");
   }
-  
 
-  // calculateMetadata dans Root.tsx gère la durée, width et height
+  // Récupère les métadonnées de la composition — calculateMetadata gère durée, width et height dynamiquement
   const compositions = await getCompositions(serveUrl, { inputProps });
   const composition = compositions.find((c) => c.id === "VideoComposition");
   if (!composition) {
     throw new Error("Composition 'VideoComposition' not found");
   }
 
+  console.log(`Rendering ${composition.id}: ${composition.durationInFrames} frames at ${composition.fps}fps — ${composition.width}x${composition.height}`);
 
+  // Crée le dossier de sortie si nécessaire
   const outputDir = path.resolve("./out");
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
@@ -47,6 +32,8 @@ export const renderVideo = async (args: {
 
   const outputLocation = path.join(outputDir, `video-${Date.now()}.mp4`);
 
+  // Lance le rendu — concurrence gérée automatiquement par Remotion selon les CPUs disponibles
+  // Note : à tuner via le paramètre concurrency une fois déployé sur le VPS
   await renderMedia({
     composition,
     serveUrl,
@@ -56,6 +43,7 @@ export const renderVideo = async (args: {
     chromiumOptions: {
       disableWebSecurity: true,
       ignoreCertificateErrors: true,
+      gl: "swiftshader",  // Nécessaire pour Docker — émulation GPU logicielle
     },
   });
 

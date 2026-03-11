@@ -1,39 +1,30 @@
 import express from "express";
-import { bundle } from "@remotion/bundler";
-import path from "path";
-import { downloadMediaToPublic } from "./services/download.service";
 import { renderVideo } from "./services/render.service";
+import { setupMcp } from "./mcp";
+import { getBundleLocation } from "./services/bundle.service";
 
 const app = express();
 app.use(express.json({ limit: "50mb" }));
 
+// Monte le serveur MCP — utilisé uniquement pour Copilot Agent en développement
+setupMcp(app);
+
 const PORT = 3000;
 
+// Route de santé — vérifie que le serveur est opérationnel
 app.get("/", (_req, res) => {
   res.send("Remotion render server is running");
 });
 
+// Route principale — reçoit les props JSON et lance le rendu vidéo
 app.post("/render", async (req, res) => {
   try {
     const inputProps = req.body;
 
-    // 1) Télécharger les médias -> /public/assets (pour staticFile)
-    if (Array.isArray(inputProps.clips)) {
-      for (let i = 0; i < inputProps.clips.length; i++) {
-        const clip = inputProps.clips[i];
-        if (clip?.url && typeof clip.url === "string" && !clip.url.startsWith("/assets/")) {
-          const newUrl = await downloadMediaToPublic(clip.url, i);
-          inputProps.clips[i].url = newUrl;
-        }
-      }
-    }
+    // 1) Récupérer le bundle depuis le cache — déjà préchauffé au démarrage
+    const bundleLocation = await getBundleLocation();
 
-    // 2) Bundle le projet Remotion
-    const bundleLocation = await bundle({
-      entryPoint: path.resolve("./src/index.ts"),
-    });
-
-    // 3) Rendu via le service
+    // 2) Lancer le rendu — les URLs distantes sont passées directement à Remotion
     const { outputLocation } = await renderVideo({
       serveUrl: bundleLocation,
       inputProps,
@@ -46,6 +37,8 @@ app.post("/render", async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`Render server running on port ${PORT}`);
+  // Préchauffage du bundle au démarrage — évite la latence sur le premier rendu
+  await getBundleLocation();
 });

@@ -1,0 +1,38 @@
+@startuml
+title Architecture globale - Remotion Render
+
+skinparam componentStyle rectangle
+
+actor "Client HTTP" as Client
+actor "Client MCP\n(Copilot Agent)" as McpClient
+
+package "Application Node.js" {
+  [Express API\nsrc/server.ts] as ExpressApi
+  [MCP Endpoint\nsrc/mcp.ts] as McpEndpoint
+  [Render Service\nsrc/services/render.service.ts] as RenderService
+  [Bundle Service / Cache\n(getBundleLocation)] as BundleService
+}
+
+package "Runtime Remotion" {
+  [Remotion Bundle\nsrc/index.ts + src/Root.tsx] as RemotionBundle
+  [Compositions\nComposition, ClipRenderer,\nAudioTrack, utils] as Compositions
+  [Remotion Renderer\n@remotion/renderer] as RemotionRenderer
+}
+
+database "Output Files\n./out/*.mp4" as Output
+cloud "Media distants\n(HTTP URLs images/vidéos/audio)" as RemoteMedia
+
+Client --> ExpressApi : POST /render
+McpClient --> McpEndpoint : POST/GET/DELETE /mcp
+McpEndpoint --> ExpressApi : proxy interne vers /render
+
+ExpressApi --> BundleService : obtenir serveUrl bundle
+ExpressApi --> RenderService : renderVideo()
+
+RenderService --> RemotionRenderer : getCompositions()\nrenderMedia()
+BundleService --> RemotionBundle : bundle(entrypoint)
+RemotionRenderer --> Compositions : exécute la composition
+Compositions --> RemoteMedia : charge les URLs des clips/audio
+RenderService --> Output : écrit le fichier MP4
+
+@enduml

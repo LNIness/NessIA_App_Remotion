@@ -1,15 +1,21 @@
 import path from "path";
 import { bundle } from "@remotion/bundler";
 
+// Cache du bundle — évite de rebundler à chaque requête
 let cachedBundleLocation: string | null = null;
+
+// Promesse en cours de bundling — évite les bundlings parallèles simultanés
 let bundlingPromise: Promise<string> | null = null;
 
 type WebpackAliasObject = { [key: string]: string | false | string[] };
 
+// Vérifie que l'alias webpack est bien un objet standard (pas un tableau ni null)
 const isAliasObject = (alias: unknown): alias is WebpackAliasObject => {
   return typeof alias === "object" && alias !== null && !Array.isArray(alias);
 };
 
+// Retourne le bundle caché ou le crée si absent
+// Thread-safe : si un bundling est déjà en cours, attend sa résolution plutôt que d'en lancer un second
 export const getBundleLocation = async (): Promise<string> => {
   if (cachedBundleLocation) return cachedBundleLocation;
   if (bundlingPromise) return bundlingPromise;
@@ -22,12 +28,11 @@ export const getBundleLocation = async (): Promise<string> => {
 
         const currentAlias = config.resolve.alias;
 
-        // On ne modifie que si alias est un objet (cas standard)
         if (isAliasObject(currentAlias)) {
           const nextAlias: WebpackAliasObject = { ...currentAlias };
 
-          // IMPORTANT:
-          // empêcher "@remotion/studio" (préfixe) de matcher "@remotion/studio/renderEntry"
+          // Fix webpack : empêcher "@remotion/studio" de matcher "@remotion/studio/renderEntry"
+          // On remplace l'alias exact par une version avec $ (correspondance stricte)
           if (
             nextAlias["@remotion/studio"] !== undefined &&
             nextAlias["@remotion/studio$"] === undefined
@@ -51,6 +56,7 @@ export const getBundleLocation = async (): Promise<string> => {
   return bundlingPromise;
 };
 
+// Invalide le cache du bundle — à appeler si le code source change en production
 export const invalidateBundleCache = (): void => {
   cachedBundleLocation = null;
   bundlingPromise = null;
