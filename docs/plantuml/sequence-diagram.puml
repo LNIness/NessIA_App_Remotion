@@ -1,0 +1,38 @@
+@startuml
+title Flux principal - Rendu vidéo via /render
+
+actor Client
+participant "Express Server\n(server.ts)" as API
+participant "Bundle Cache\n(getBundleLocation)" as Bundle
+participant "Render Service\n(render.service.ts)" as RenderSvc
+participant "Remotion Renderer\n(@remotion/renderer)" as Renderer
+participant "Filesystem\n./out" as FS
+
+Client -> API: POST /render {inputProps}
+activate API
+
+API -> Bundle: getBundleLocation()
+alt bundle absent
+  Bundle -> Bundle: bundle(entryPoint: src/index.ts)
+  Bundle --> API: serveUrl (nouveau bundle)
+else bundle présent
+  Bundle --> API: serveUrl (cache)
+end
+
+API -> RenderSvc: renderVideo({serveUrl, inputProps})
+activate RenderSvc
+
+RenderSvc -> Renderer: getCompositions(serveUrl, inputProps)
+Renderer --> RenderSvc: compositions[]
+RenderSvc -> RenderSvc: sélectionner "VideoComposition"
+
+RenderSvc -> FS: créer ./out si nécessaire
+RenderSvc -> Renderer: renderMedia(composition, serveUrl, inputProps, outputLocation)
+Renderer --> RenderSvc: rendu terminé
+RenderSvc --> API: {outputLocation}
+deactivate RenderSvc
+
+API --> Client: 200 {success: true, output}
+deactivate API
+
+@enduml

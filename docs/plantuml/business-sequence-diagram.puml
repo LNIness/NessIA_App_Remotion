@@ -1,0 +1,31 @@
+@startuml
+title Diagramme de sequence (flux metier principal)
+
+actor "Utilisateur / Client" as User
+participant "API de rendu" as API
+participant "Orchestrateur de rendu" as Orchestrateur
+participant "Moteur video" as Moteur
+participant "Stockage sortie" as Stockage
+
+User -> API: Demande de generation video\n(storyboard + options)
+activate API
+
+API -> API: Validation des donnees\n(clips, durees, format)
+API -> Orchestrateur: Creer un JobRendu
+activate Orchestrateur
+
+Orchestrateur -> Moteur: Preparer composition video
+Orchestrateur -> Moteur: Appliquer transitions, effets, audio
+Orchestrateur -> Moteur: Lancer le rendu
+Moteur --> Orchestrateur: Fichier MP4 genere
+
+Orchestrateur -> Stockage: Enregistrer la sortie
+Stockage --> Orchestrateur: Chemin de sortie
+
+Orchestrateur --> API: ResultatRendu(success, output)
+deactivate Orchestrateur
+
+API --> User: Reponse succes + URL/chemin de la video
+deactivate API
+
+@enduml

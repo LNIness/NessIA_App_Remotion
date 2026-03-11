@@ -1,0 +1,122 @@
+@startuml
+title Remotion Render - Diagramme de classes
+
+skinparam classAttributeIconSize 0
+
+package "API Serveur" {
+  class Server {
+    - bundleCache: string?
+    + getBundleLocation(): Promise<string>
+    + POST /render(inputProps): {success, output}
+    + setupMcp(app): void
+  }
+
+  class RenderService {
+    + renderVideo(args): Promise<{outputLocation}>
+  }
+
+  class McpModule {
+    - sessions: Map<string, Session>
+    + setupMcp(app): void
+    + createServer(): McpServer
+  }
+}
+
+package "Compositions Remotion" {
+  class RemotionRoot {
+    + render(): VideoCompositionConfig
+  }
+
+  class VideoCompositionConfig {
+    - DEFAULTS: {fps, width, height}
+    + calculateMetadata(props): {durationInFrames, width, height}
+  }
+
+  class VideoComposition {
+    + render(props: VideoCompositionProps): JSX.Element
+  }
+
+  class ClipRenderer {
+    + render(clip: MediaClip, durationInFrames: number): JSX.Element
+  }
+
+  class AudioTrack {
+    + render(musicUrl: string, volume?: number): JSX.Element
+  }
+}
+
+package "Modèle de données" {
+  class VideoCompositionProps {
+    + clips?: MediaClip[]
+    + audio?: {musicUrl: string, volume?: number}
+    + width?: number
+    + height?: number
+  }
+
+  class MediaClip {
+    + id: string
+    + type: "image" | "video"
+    + url: string
+    + duration: number
+    + trimStart?: number
+    + transitionToNext?: TransitionConfig
+    + effect?: ZoomEffect
+  }
+
+  class TransitionConfig {
+    + type: TransitionType
+    + timing?: "linear" | "spring"
+    + durationInFrames?: number
+    + damping?: number
+  }
+
+  class ZoomEffect {
+    + type: "zoomIn" | "zoomOut" | "kenBurns"
+    + intensity?: number
+    + fromX?: number
+    + fromY?: number
+    + toX?: number
+    + toY?: number
+  }
+}
+
+package "Utilitaires" {
+  class buildTiming {
+    + buildTiming(transition: TransitionConfig, fps: number)
+  }
+
+  class calculateTotalFrames {
+    + calculateTotalFrames(clips: MediaClip[], fps: number): number
+  }
+
+  class useZoomStyle {
+    + useZoomStyle(effect: ZoomEffect, durationInFrames: number): CSSProperties
+  }
+
+  class MyTransitions {
+    + whiteFade
+    + swipeLeft
+    + swipeRight
+    + swipeUp
+    + swipeDown
+  }
+}
+
+Server --> RenderService : appelle
+Server --> McpModule : initialise
+RenderService --> VideoCompositionProps : consomme
+RemotionRoot --> VideoCompositionConfig
+VideoCompositionConfig --> VideoComposition : configure
+VideoCompositionConfig --> calculateTotalFrames : utilise
+VideoComposition --> VideoCompositionProps : utilise
+VideoComposition --> ClipRenderer : compose
+VideoComposition --> AudioTrack : compose
+VideoComposition --> buildTiming : utilise
+ClipRenderer --> MediaClip : utilise
+ClipRenderer --> useZoomStyle : applique
+MediaClip --> TransitionConfig
+MediaClip --> ZoomEffect
+TransitionConfig --> MyTransitions : référence
+buildTiming --> MyTransitions : référence
+
+@enduml
