@@ -1,13 +1,13 @@
-import React from "react";
-import { staticFile } from "remotion";
-import { Audio } from "@remotion/media";
+import React from 'react';
+import { Audio } from '@remotion/media';
 
 type AudioTrackProps = {
   musicUrl: string;
   volume?: number;
 };
 
+// Composant de rendu de la musique de fond
+// Les URLs sont passées directement — plus besoin de staticFile depuis la suppression du téléchargement local
 export const AudioTrack: React.FC<AudioTrackProps> = ({ musicUrl, volume }) => {
-  const src = musicUrl.startsWith("/") ? staticFile(musicUrl) : musicUrl;
-  return <Audio src={src} volume={volume ?? 1} />;
+  return <Audio src={musicUrl} volume={volume ?? 1} />;
 };

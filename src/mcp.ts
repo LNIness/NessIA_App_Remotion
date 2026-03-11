@@ -4,15 +4,20 @@ import { z } from "zod";
 import express, { Request, Response } from "express";
 import crypto from "crypto";
 
+// Configure le serveur MCP (Model Context Protocol) sur l'application Express
+// Utilisé uniquement pour Copilot Agent en mode développement — pas pour n8n en production
 export const setupMcp = (app: express.Application) => {
+  // Stockage des sessions MCP actives — une session par client connecté
   const sessions = new Map<string, { transport: StreamableHTTPServerTransport; server: McpServer }>();
 
+  // Crée une instance MCP avec l'outil render_video enregistré
   const createServer = () => {
     const server = new McpServer({
       name: "remotion-render",
       version: "1.0.0",
     });
 
+    // Outil exposé à Copilot Agent — schéma identique au contrat JSON de l'API /render
     server.registerTool(
       "render_video",
       {
@@ -27,16 +32,16 @@ export const setupMcp = (app: express.Application) => {
             transitionToNext: z.object({
               type: z.enum(["whiteFade", "swipeLeft", "swipeRight", "swipeUp", "swipeDown"]),
               timing: z.enum(["linear", "spring"]).optional(),
-              durationInFrames: z.number().optional(),
-              damping: z.number().optional(),
+              durationInFrames: z.number().optional(), // linear uniquement
+              damping: z.number().optional(),          // spring uniquement
             }).optional(),
             effect: z.object({
               type: z.enum(["zoomIn", "zoomOut", "kenBurns"]),
               intensity: z.number().optional(),
-              fromX: z.number().optional(),
-              fromY: z.number().optional(),
-              toX: z.number().optional(),
-              toY: z.number().optional(),
+              fromX: z.number().optional(), // kenBurns uniquement
+              fromY: z.number().optional(), // kenBurns uniquement
+              toX: z.number().optional(),   // kenBurns uniquement
+              toY: z.number().optional(),   // kenBurns uniquement
             }).optional(),
           })),
           width: z.number().optional(),
@@ -48,6 +53,7 @@ export const setupMcp = (app: express.Application) => {
           }).optional(),
         }) as unknown as import("@modelcontextprotocol/sdk/server/zod-compat").AnySchema,
       },
+      // Délègue le rendu à l'API /render — le MCP est un simple proxy
       async (inputProps: any) => {
         const response = await fetch("http://localhost:3000/render", {
           method: "POST",
@@ -64,11 +70,13 @@ export const setupMcp = (app: express.Application) => {
     return server;
   };
 
+  // POST /mcp — initialise une session ou réutilise une session existante
   app.post("/mcp", async (req: Request, res: Response) => {
     const sessionId = req.headers["mcp-session-id"] as string;
     let session = sessions.get(sessionId);
 
     if (!session) {
+      // Nouvelle session — crée un transport et un serveur MCP dédiés
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => crypto.randomUUID(),
         onsessioninitialized: (id) => {
@@ -83,6 +91,7 @@ export const setupMcp = (app: express.Application) => {
     await session.transport.handleRequest(req, res, req.body);
   });
 
+  // GET /mcp — stream SSE pour les événements MCP (notifications, progression)
   app.get("/mcp", async (req: Request, res: Response) => {
     const sessionId = req.headers["mcp-session-id"] as string;
     const session = sessions.get(sessionId);
@@ -93,6 +102,7 @@ export const setupMcp = (app: express.Application) => {
     await session.transport.handleRequest(req, res);
   });
 
+  // DELETE /mcp — ferme et supprime une session MCP
   app.delete("/mcp", async (req: Request, res: Response) => {
     const sessionId = req.headers["mcp-session-id"] as string;
     sessions.delete(sessionId);

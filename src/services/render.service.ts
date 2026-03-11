@@ -15,7 +15,7 @@ export const renderVideo = async (args: {
     throw new Error("No clips provided");
   }
 
-  // calculateMetadata dans Root.tsx gère la durée, width et height
+  // Récupère les métadonnées de la composition — calculateMetadata gère durée, width et height dynamiquement
   const compositions = await getCompositions(serveUrl, { inputProps });
   const composition = compositions.find((c) => c.id === "VideoComposition");
   if (!composition) {
@@ -24,13 +24,16 @@ export const renderVideo = async (args: {
 
   console.log(`Rendering ${composition.id}: ${composition.durationInFrames} frames at ${composition.fps}fps — ${composition.width}x${composition.height}`);
 
+  // Crée le dossier de sortie si nécessaire
   const outputDir = path.resolve("./out");
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
   }
 
   const outputLocation = path.join(outputDir, `video-${Date.now()}.mp4`);
-  
+
+  // Lance le rendu — concurrence gérée automatiquement par Remotion selon les CPUs disponibles
+  // Note : à tuner via le paramètre concurrency une fois déployé sur le VPS
   await renderMedia({
     composition,
     serveUrl,
@@ -40,7 +43,7 @@ export const renderVideo = async (args: {
     chromiumOptions: {
       disableWebSecurity: true,
       ignoreCertificateErrors: true,
-      gl: "swiftshader",
+      gl: "swiftshader",  // Nécessaire pour Docker — émulation GPU logicielle
     },
   });
 
