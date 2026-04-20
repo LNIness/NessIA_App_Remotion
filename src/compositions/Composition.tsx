@@ -28,8 +28,8 @@ export const VideoComposition: React.FC<VideoCompositionProps> = (props) => {
                 <ClipRenderer clip={clip} durationInFrames={durationInFrames} />
               </TransitionSeries.Sequence>
 
-              {/* Transition vers le clip suivant — uniquement si définie et pas sur le dernier clip */}
-              {transition && isNotLastClip ? (
+              {/* Transition vers le clip suivant — uniquement si définie, connue et pas sur le dernier clip */}
+              {transition && isNotLastClip && MyTransitions[transition.type] ? (
                 <TransitionSeries.Transition
                   presentation={MyTransitions[transition.type].presentation}
                   timing={buildTiming(transition, fps)}
