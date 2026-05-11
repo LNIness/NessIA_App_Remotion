@@ -1,0 +1,29 @@
+@startuml
+title Diagramme de composants (vue metier)
+
+skinparam componentStyle rectangle
+
+actor "Client API" as Client
+actor "Agent IA (MCP)" as Agent
+
+[Service de Rendu Video] as Service
+[Canal MCP] as MCP
+[Orchestrateur Storyboard] as Orchestrateur
+[Bibliotheque Effets & Transitions] as Librairie
+[Moteur de Composition Video] as Moteur
+[Stockage des Sorties] as Stockage
+[Medias Sources (HTTP)] as Medias
+
+Client --> Service : Demande /render
+Agent --> MCP : Demande en langage naturel
+MCP --> Service : Demande de rendu standardisee
+
+Service --> Orchestrateur : Normaliser le projet video
+Orchestrateur --> Librairie : Choisir effets/transitions
+Orchestrateur --> Moteur : Construire et rendre la video
+Moteur --> Medias : Lire images/videos/audio
+Moteur --> Stockage : Ecrire MP4 final
+Service <-- Stockage : Chemin resultat
+Service --> Client : Reponse de rendu
+
+@enduml

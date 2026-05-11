@@ -1,16 +1,23 @@
+# Dépendances
 node_modules
+
+# Build TypeScript
 dist
+
+# Fichiers système
 .DS_Store
+
+# Variables d'environnement
 .env
 
-# Ignore the output video from Git but not videos you import into src/.
+# Vidéos générées par le serveur de rendu
 out
 
-# Médias téléchargés dynamiquement par le serveur
-public/assets/
-
-# Bundle Remotion généré
+# Bundle Remotion généré dynamiquement — recréé au démarrage du serveur
 .remotion/
 
-# Visual Studio Code settings
+# Médias téléchargés dynamiquement — plus utilisé depuis la suppression du téléchargement local
+public/assets/
+
+# Paramètres Visual Studio Code
 .vscode/

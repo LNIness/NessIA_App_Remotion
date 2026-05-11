@@ -1,0 +1,63 @@
+@startuml
+title Diagramme de classes (vue metier)
+
+skinparam classAttributeIconSize 0
+
+class ProjetVideo {
+  + format: string
+  + fps: number
+  + largeur: number
+  + hauteur: number
+}
+
+class Storyboard {
+  + clips: ClipMedia[]
+}
+
+class ClipMedia {
+  + id: string
+  + type: image|video
+  + sourceUrl: string
+  + dureeSecondes: number
+  + trimStartSecondes: number?
+}
+
+class Transition {
+  + type: whiteFade|swipe*
+  + timing: linear|spring
+  + dureeFrames: number?
+  + damping: number?
+}
+
+class EffetVisuel {
+  + type: zoomIn|zoomOut|kenBurns
+  + intensite: number?
+  + positionDepart: x,y?
+  + positionArrivee: x,y?
+}
+
+class BandeSon {
+  + musicUrl: string
+  + volume: number
+}
+
+class JobRendu {
+  + id: string
+  + statut: queued|running|done|failed
+  + outputPath: string
+}
+
+class ResultatRendu {
+  + success: boolean
+  + output: string
+}
+
+ProjetVideo "1" o-- "1" Storyboard
+Storyboard "1" o-- "1..*" ClipMedia
+ClipMedia "0..1" --> "1" Transition : vers clip suivant
+ClipMedia "0..1" --> "1" EffetVisuel : applique
+ProjetVideo "0..1" o-- "1" BandeSon
+ProjetVideo "1" --> "1" JobRendu : lance
+JobRendu "1" --> "1" ResultatRendu : produit
+
+@enduml
