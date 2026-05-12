@@ -12,6 +12,8 @@ export const VideoComposition: React.FC<VideoCompositionProps> = (props) => {
   const { fps, width, height } = useVideoConfig();
   const clips = props.clips ?? [];
 
+  console.log('Audio props:', JSON.stringify(props.audio));
+
   return (
     <AbsoluteFill style={{ backgroundColor: 'black', width, height }}>
       <TransitionSeries>

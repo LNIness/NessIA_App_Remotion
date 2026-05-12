@@ -60,6 +60,8 @@ export const renderVideo = async (args: {
     codec: "h264",
     outputLocation,
     inputProps,
+    muted: false,
+    enforceAudioTrack: true,
     chromiumOptions: {
       disableWebSecurity: true,
       ignoreCertificateErrors: true,
