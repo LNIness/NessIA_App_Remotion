@@ -6,11 +6,13 @@
       dockerfile: Dockerfile
     ports:
       - '3000:3000'
-    shm_size: '2gb'
+    shm_size: '4gb'
+    mem_limit: 8g
     environment:
       REMOTION_CHROME_CACHE_DIR: /app/.remotion-browser-cache
       PUPPETEER_CACHE_DIR: /app/.remotion-browser-cache
     volumes:
       - ./output:/app/out
       - ./chrome-cache:/app/.remotion-browser-cache
+      - ./public/assets:/app/public/assets
     restart: unless-stopped

@@ -24,6 +24,11 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
+ENV REMOTION_CHROME_CACHE_DIR=/app/.remotion-browser-cache
+ENV PUPPETEER_CACHE_DIR=/app/.remotion-browser-cache
+
+RUN mkdir -p /app/.remotion-browser-cache
+
 COPY package*.json ./
 RUN npm install
 
@@ -32,5 +37,3 @@ COPY . .
 EXPOSE 3000
 
 CMD ["npx", "tsx", "src/server.ts"]
-ENV REMOTION_CHROME_CACHE_DIR=/app/.remotion-browser-cache
-ENV PUPPETEER_CACHE_DIR=/app/.remotion-browser-cache
