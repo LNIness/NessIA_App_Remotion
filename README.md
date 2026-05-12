@@ -1,7 +1,7 @@
 # Remotion Render Server (Docker)
 
 Serveur Express qui reçoit un storyboard JSON (`clips`) et génère une vidéo via Remotion.
-Les médias distants (image/vidéo/audio) sont téléchargés dans `public/assets` pour être servis au rendu.
+Les médias distants (image/vidéo) sont téléchargés dans `public/assets` pour être servis au rendu.
 
 ---
 
@@ -17,7 +17,7 @@ Les médias distants (image/vidéo/audio) sont téléchargés dans `public/asset
 
 ```powershell
 src/
-├── server.ts                         # API HTTP /render, /download-audio et /mcp
+├── server.ts                         # API HTTP /render et /mcp
 ├── mcp.ts                            # Serveur MCP pour Copilot Agent (VS Code)
 ├── Root.tsx                          # Point d'entrée Remotion, déclare les compositions
 ├── compositions/
@@ -36,7 +36,7 @@ src/
 ├── services/
 │   ├── download.service.ts           # Download des médias vers public/assets
 │   ├── bundle.service.ts             # Cache bundle Remotion (thread-safe)
-│   └── render.service.ts             # Orchestration du rendu + téléchargement audio auto
+│   └── render.service.ts             # Orchestration du rendu Remotion
 └── dev/
     └── testPayload.ts                # Payload de test pour Remotion Studio (DEV uniquement)
 ```
@@ -79,7 +79,7 @@ src/
     }
   ],
   "audio": {
-    "musicUrl": "https://...",
+    "musicUrl": "/assets/music.mp3",
     "volume": 0.8
   }
 }
@@ -87,14 +87,14 @@ src/
 
 ### Champs racine
 
-| Champ            | Type        | Défaut | Description                                 |
-| ---------------- | ----------- | ------ | ------------------------------------------- |
-| `width`          | number      | 1080   | Largeur en pixels                           |
-| `height`         | number      | 1920   | Hauteur en pixels                           |
-| `fps`            | number      | 30     | Images par seconde                          |
-| `clips`          | MediaClip[] | —      | Liste des plans                             |
-| `audio.musicUrl` | string      | —      | URL externe (Suno, etc.) — téléchargée auto |
-| `audio.volume`   | number      | 1      | Volume entre 0 et 1                         |
+| Champ            | Type        | Défaut | Description          |
+| ---------------- | ----------- | ------ | -------------------- |
+| `width`          | number      | 1080   | Largeur en pixels    |
+| `height`         | number      | 1920   | Hauteur en pixels    |
+| `fps`            | number      | 30     | Images par seconde   |
+| `clips`          | MediaClip[] | —      | Liste des plans      |
+| `audio.musicUrl` | string      | —      | URL ou `/assets/...` |
+| `audio.volume`   | number      | 1      | Volume entre 0 et 1  |
 
 ### MediaClip
 
@@ -147,46 +147,6 @@ src/
 
 ---
 
-## Gestion audio
-
-### Téléchargement automatique
-
-Lorsque `audio.musicUrl` est une URL externe (Suno, tempfile, etc.), `render.service.ts` la télécharge automatiquement dans `public/assets/` avant le rendu et remplace l'URL par une URL locale servie par Express.
-
-**Aucune action manuelle requise** — passe simplement l'URL externe dans le payload :
-
-```json
-"audio": {
-  "musicUrl": "https://tempfile.aiquickdraw.com/r/xxx.mp3",
-  "volume": 0.8
-}
-```
-
-### Route manuelle `/download-audio`
-
-Pour télécharger un fichier audio sans lancer un rendu :
-
-```powershell
-Invoke-WebRequest -Uri "http://localhost:3000/download-audio" `
-  -Method POST `
-  -ContentType "application/json" `
-  -UseBasicParsing `
-  -Body '{"url":"https://..."}'
-```
-
-Réponse :
-
-```json
-{ "audioUrl": "http://localhost:3000/assets/uuid.mp3" }
-```
-
-### Persistance des assets audio
-
-Le dossier `public/assets/` est monté en volume Docker (`./public/assets:/app/public/assets`).
-Les fichiers audio téléchargés survivent aux rebuilds du container.
-
----
-
 ## Démarrage (Docker Compose)
 
 ### 1) Créer les dossiers locaux
@@ -194,7 +154,6 @@ Les fichiers audio téléchargés survivent aux rebuilds du container.
 ```powershell
 mkdir .\output -Force | Out-Null
 mkdir .\chrome-cache -Force | Out-Null
-mkdir .\public\assets -Force | Out-Null
 ```
 
 ### 2) Lancer le serveur
@@ -275,25 +234,6 @@ Invoke-RestMethod -Uri "http://localhost:3000/render" `
   }'
 ```
 
-### Avec musique (URL externe — téléchargement automatique)
-
-```powershell
-Invoke-RestMethod -Uri "http://localhost:3000/render" `
-  -Method POST `
-  -ContentType "application/json" `
-  -Body '{
-    "width": 1080, "height": 1920, "fps": 30,
-    "clips": [
-      { "id": "clip-1", "type": "image", "url": "https://sentience.pm/assets/img/poster.jpg", "duration": 4.0, "effect": { "type": "kenBurns", "intensity": 1.2 } },
-      { "id": "clip-2", "type": "image", "url": "https://sentience.pm/assets/img/poster.jpg", "duration": 4.0, "effect": { "type": "zoomIn", "intensity": 1.2 } }
-    ],
-    "audio": {
-      "musicUrl": "https://tempfile.aiquickdraw.com/r/xxx.mp3",
-      "volume": 0.8
-    }
-  }'
-```
-
 ### Réponse attendue
 
 ```json
@@ -347,7 +287,7 @@ Le serveur expose un endpoint MCP sur `/mcp` pour permettre à Copilot Agent de 
 
 ### Utilisation dans Copilot Agent
 
-```
+```powershell
 Génère une vidéo avec ces deux clips :
 - https://... pendant 3 secondes
 - https://... pendant 3 secondes
@@ -358,11 +298,10 @@ avec une transition whiteFade entre les deux, format 9:16
 
 ## Volumes & Cache
 
-| Volume                                        | Description                                     |
-| --------------------------------------------- | ----------------------------------------------- |
-| `./output:/app/out`                           | Récupère les mp4 rendus                         |
-| `./chrome-cache:/app/.remotion-browser-cache` | Cache Chromium persisté entre les redémarrages  |
-| `./public/assets:/app/public/assets`          | Assets audio/media persistés entre les rebuilds |
+| Volume                                        | Description                                    |
+| --------------------------------------------- | ---------------------------------------------- |
+| `./output:/app/out`                           | Récupère les mp4 rendus                        |
+| `./chrome-cache:/app/.remotion-browser-cache` | Cache Chromium persisté entre les redémarrages |
 
 ### Variables d'environnement
 
@@ -399,12 +338,6 @@ PUPPETEER_CACHE_DIR=/app/.remotion-browser-cache
 
 - Vérifier que les variables `ENV` sont placées **avant** `CMD` dans le Dockerfile
 - Lancer `docker run --rm --entrypoint sh <image> -c "ls -la /app"` pour vérifier que les fichiers sont bien copiés
-
-### 6) Musique absente de la vidéo
-
-- Vérifier que la route `/render` est utilisée (et non le CLI `npx remotion render`) — le téléchargement automatique ne fonctionne qu'en passant par le serveur Express
-- Vérifier les logs Docker : `Downloading audio:` et `Audio ready:` doivent apparaître
-- Si l'URL audio externe est expirée, en générer une nouvelle via Suno
 
 ---
 
